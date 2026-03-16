@@ -1,0 +1,8 @@
+{
+  "name": "A.R.V.I.S.",
+  "description": "Autonomous Real-time Voice Interface System - An AI Developer Agent platform with voice control, full-stack scaffolding, and one-click deployment.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ]
+}
