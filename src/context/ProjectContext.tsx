@@ -14,6 +14,8 @@ interface ProjectContextType {
   activeFile: string;
   setActiveFile: (name: string) => void;
   runCommand: (cmd: string) => Promise<any>;
+  runAiCommand: (command: string, context?: string) => Promise<any>;
+  runCommandFromAI: (prompt: string) => Promise<any>;
   // Voice State
   isListening: boolean;
   setIsListening: (val: boolean) => void;
@@ -69,7 +71,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   const runCommand = async (cmd: string) => {
     setTerminalOutput(prev => [...prev, `> ${cmd}`]);
-    
     try {
       const res = await fetch('/api/terminal/exec', {
         method: 'POST',
@@ -77,12 +78,45 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ command: cmd, projectId: 'demo' })
       });
       const data = await res.json();
-      setTerminalOutput(prev => [...prev, ...data.output.split('\n')]);
+      if (data.output) {
+        setTerminalOutput(prev => [...prev, ...data.output.split('\n')]);
+      } else {
+        setTerminalOutput(prev => [...prev, JSON.stringify(data)]);
+      }
       return data;
     } catch (err) {
       setTerminalOutput(prev => [...prev, "Error: Failed to execute command"]);
       return { error: true };
     }
+  };
+
+  const runAiCommand = async (command: string, context = '') => {
+    setTerminalOutput(prev => [...prev, `> AI Command: ${command}`]);
+    try {
+      const res = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command, systemInstruction: context })
+      });
+      const data = await res.json();
+      if (data.text) {
+        setTerminalOutput(prev => [...prev, `AI: ${data.text}`]);
+      }
+      return data;
+    } catch (err) {
+      setTerminalOutput(prev => [...prev, "Error: AI command failed"]);
+      return { error: true };
+    }
+  };
+
+  const runCommandFromAI = async (prompt: string) => {
+    const aiResult = await runAiCommand(prompt, `You are an automation assistant. Convert user intent to a shell command and keep it safe.`);
+    if (aiResult.error || !aiResult.text) {
+      return { error: true, message: 'AI did not return a command' };
+    }
+    const generated = aiResult.text.trim();
+    setTerminalOutput(prev => [...prev, `> AI generated: ${generated}`]);
+    return runCommand(generated);
   };
 
   return (
@@ -101,7 +135,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       status, setStatus,
       errorMessage, setErrorMessage,
       activeStage, setActiveStage,
-      isVoiceEnabled, setIsVoiceEnabled
+      isVoiceEnabled, setIsVoiceEnabled,
+      runAiCommand,
+      runCommandFromAI
     }}>
       {children}
     </ProjectContext.Provider>
